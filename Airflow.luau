@@ -1,5 +1,5 @@
 local Airflow = {}
-Airflow.Version = "2.0"
+Airflow.Version = "2.0.1"
 Airflow.Windows = {}
 
 local Players = game:GetService("Players")
@@ -307,104 +307,56 @@ end
 
 local KEY_NAMES = {}
 local function build_key_names()
-        local names = {
-                [Enum.KeyCode.A] = "A",
-                [Enum.KeyCode.B] = "B",
-                [Enum.KeyCode.C] = "C",
-                [Enum.KeyCode.D] = "D",
-                [Enum.KeyCode.E] = "E",
-                [Enum.KeyCode.F] = "F",
-                [Enum.KeyCode.G] = "G",
-                [Enum.KeyCode.H] = "H",
-                [Enum.KeyCode.I] = "I",
-                [Enum.KeyCode.J] = "J",
-                [Enum.KeyCode.K] = "K",
-                [Enum.KeyCode.L] = "L",
-                [Enum.KeyCode.M] = "M",
-                [Enum.KeyCode.N] = "N",
-                [Enum.KeyCode.O] = "O",
-                [Enum.KeyCode.P] = "P",
-                [Enum.KeyCode.Q] = "Q",
-                [Enum.KeyCode.R] = "R",
-                [Enum.KeyCode.S] = "S",
-                [Enum.KeyCode.T] = "T",
-                [Enum.KeyCode.U] = "U",
-                [Enum.KeyCode.V] = "V",
-                [Enum.KeyCode.W] = "W",
-                [Enum.KeyCode.X] = "X",
-                [Enum.KeyCode.Y] = "Y",
-                [Enum.KeyCode.Z] = "Z",
-                [Enum.KeyCode.Zero] = "0",
-                [Enum.KeyCode.One] = "1",
-                [Enum.KeyCode.Two] = "2",
-                [Enum.KeyCode.Three] = "3",
-                [Enum.KeyCode.Four] = "4",
-                [Enum.KeyCode.Five] = "5",
-                [Enum.KeyCode.Six] = "6",
-                [Enum.KeyCode.Seven] = "7",
-                [Enum.KeyCode.Eight] = "8",
-                [Enum.KeyCode.Nine] = "9",
-                [Enum.KeyCode.LeftShift] = "Lshift",
-                [Enum.KeyCode.RightShift] = "Rshift",
-                [Enum.KeyCode.LeftControl] = "Lcontrol",
-                [Enum.KeyCode.RightControl] = "Rcontrol",
-                [Enum.KeyCode.LeftAlt] = "Lmenu",
-                [Enum.KeyCode.RightAlt] = "Rmenu",
-                [Enum.KeyCode.Tab] = "Tab",
-                [Enum.KeyCode.CapsLock] = "Caps",
-                [Enum.KeyCode.Space] = "Spacebar",
-                [Enum.KeyCode.Backspace] = "Back",
-                [Enum.KeyCode.Enter] = "Enter",
-                [Enum.KeyCode.Return] = "Enter",
-                [Enum.KeyCode.Insert] = "Insert",
-                [Enum.KeyCode.Delete] = "Delete",
-                [Enum.KeyCode.Home] = "Home",
-                [Enum.KeyCode.End] = "End",
-                [Enum.KeyCode.PageUp] = "Pgup",
-                [Enum.KeyCode.PageDown] = "Pgdwn",
-                [Enum.KeyCode.Up] = "Up",
-                [Enum.KeyCode.Down] = "Down",
-                [Enum.KeyCode.Left] = "Left",
-                [Enum.KeyCode.Right] = "Right",
-                [Enum.KeyCode.F1] = "F1",
-                [Enum.KeyCode.F2] = "F2",
-                [Enum.KeyCode.F3] = "F3",
-                [Enum.KeyCode.F4] = "F4",
-                [Enum.KeyCode.F5] = "F5",
-                [Enum.KeyCode.F6] = "F6",
-                [Enum.KeyCode.F7] = "F7",
-                [Enum.KeyCode.F8] = "F8",
-                [Enum.KeyCode.F9] = "F9",
-                [Enum.KeyCode.F10] = "F10",
-                [Enum.KeyCode.F11] = "F11",
-                [Enum.KeyCode.F12] = "F12",
-                [Enum.KeyCode.Print] = "Prtsc",
-                [Enum.KeyCode.ScrollLock] = "Scroll lock",
-                [Enum.KeyCode.NumLock] = "Num lock",
-                [Enum.KeyCode.Minus] = "-",
-                [Enum.KeyCode.Equals] = "+",
-                [Enum.KeyCode.LeftBracket] = "[{",
-                [Enum.KeyCode.RightBracket] = "}]",
-                [Enum.KeyCode.Semicolon] = ";",
-                [Enum.KeyCode.Comma] = ",",
-                [Enum.KeyCode.Period] = ".",
-                [Enum.KeyCode.Slash] = "/?",
-                [Enum.KeyCode.BackSlash] = "\\|",
-                [Enum.KeyCode.Quote] = "'\"",
+        local key_labels = {
+                A = "A", B = "B", C = "C", D = "D", E = "E", F = "F", G = "G", H = "H",
+                I = "I", J = "J", K = "K", L = "L", M = "M", N = "N", O = "O", P = "P",
+                Q = "Q", R = "R", S = "S", T = "T", U = "U", V = "V", W = "W", X = "X",
+                Y = "Y", Z = "Z",
+                Zero = "0", One = "1", Two = "2", Three = "3", Four = "4",
+                Five = "5", Six = "6", Seven = "7", Eight = "8", Nine = "9",
+                LeftShift = "Lshift", RightShift = "Rshift",
+                LeftControl = "Lcontrol", RightControl = "Rcontrol",
+                LeftAlt = "Lmenu", RightAlt = "Rmenu",
+                Tab = "Tab", CapsLock = "Caps", Space = "Spacebar", Backspace = "Back",
+                Return = "Enter", Insert = "Insert", Delete = "Delete",
+                Home = "Home", End = "End", PageUp = "Pgup", PageDown = "Pgdwn",
+                Up = "Up", Down = "Down", Left = "Left", Right = "Right",
+                F1 = "F1", F2 = "F2", F3 = "F3", F4 = "F4", F5 = "F5", F6 = "F6",
+                F7 = "F7", F8 = "F8", F9 = "F9", F10 = "F10", F11 = "F11", F12 = "F12",
+                Print = "Prtsc", ScrollLock = "Scroll lock", NumLock = "Num lock",
+                Minus = "-", Equals = "+", LeftBracket = "[{", RightBracket = "}]",
+                Semicolon = ";", Comma = ",", Period = ".", Slash = "/?",
+                BackSlash = "\\|", Quote = "'\"",
         }
-        for k, v in pairs(names) do
-                KEY_NAMES[k.Name] = v
+        for name, label in pairs(key_labels) do
+                local ok, item = pcall(function()
+                        return Enum.KeyCode[name]
+                end)
+                if ok and item then
+                        KEY_NAMES[item.Name] = label
+                end
         end
 end
 build_key_names()
 
-local MOUSE_NAMES = {
-        [Enum.UserInputType.MouseButton1] = "M1",
-        [Enum.UserInputType.MouseButton2] = "M2",
-        [Enum.UserInputType.MouseButton3] = "M3",
-        [Enum.UserInputType.MouseButton4] = "M4",
-        [Enum.UserInputType.MouseButton5] = "M5",
-}
+local MOUSE_NAMES = {}
+do
+        local mouse_labels = {
+                MouseButton1 = "M1",
+                MouseButton2 = "M2",
+                MouseButton3 = "M3",
+                MouseButton4 = "M4",
+                MouseButton5 = "M5",
+        }
+        for name, label in pairs(mouse_labels) do
+                local ok, item = pcall(function()
+                        return Enum.UserInputType[name]
+                end)
+                if ok and item then
+                        MOUSE_NAMES[item] = label
+                end
+        end
+end
 
 local function key_to_string(bind)
         if not bind.Key then
