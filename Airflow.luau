@@ -1,5 +1,5 @@
 local Airflow = {}
-Airflow.Version = "2.0.1"
+Airflow.Version = "2.1.0"
 Airflow.Windows = {}
 
 local Players = game:GetService("Players")
@@ -194,6 +194,8 @@ local DEFAULT_THEME = {
         SubBar = { Color = rgb(217, 217, 217), Transparency = 0.92 },
         TabActive = { Color = rgb(255, 255, 255), Transparency = 0.96 },
         Popup = { Color = rgb(5, 5, 5), Transparency = 0.05 },
+        Watermark = { Color = rgb(5, 5, 5), Transparency = 0.05 },
+        Keybinds = { Color = rgb(5, 5, 5), Transparency = 0.05 },
         Picker = { Color = rgb(16, 16, 16), Transparency = 0 },
         TextPrimary = { Color = rgb(255, 255, 255), Transparency = 0 },
         TextSecondary = { Color = rgb(255, 255, 255), Transparency = 0.5 },
@@ -674,6 +676,15 @@ local function build_window(opts)
         win._scale = opts.Scale or 1
         win._draggable = opts.Draggable ~= false
         win._blur = nil
+        win._blur_cc = nil
+        win.BlurConfig = {
+                Enabled = opts.Blur ~= false,
+                Size = clamp(opts.BlurSize or 24, 0, 64),
+                Tint = opts.BlurTint or rgb(255, 255, 255),
+                Brightness = opts.BlurBrightness or 0,
+                Saturation = opts.BlurSaturation or 0,
+                Contrast = opts.BlurContrast or 0,
+        }
 
         local scale = opts.Scale or 1
         local scr = make("ScreenGui", {
@@ -879,7 +890,7 @@ local function build_window(opts)
                 end
         end))
 
-        if opts.Blur ~= false then
+        if win.BlurConfig.Enabled then
                 local ok, blur = pcall(function()
                         local b = Instance.new("BlurEffect")
                         b.Name = "AirflowBlur"
@@ -889,6 +900,19 @@ local function build_window(opts)
                 end)
                 if ok then
                         win._blur = blur
+                end
+                local ok_cc, cc = pcall(function()
+                        local c = Instance.new("ColorCorrectionEffect")
+                        c.Name = "AirflowColorCorrection"
+                        c.Brightness = 0
+                        c.Saturation = 0
+                        c.Contrast = 0
+                        c.TintColor = rgb(255, 255, 255)
+                        c.Parent = Lighting
+                        return c
+                end)
+                if ok_cc then
+                        win._blur_cc = cc
                 end
         end
 
@@ -1149,6 +1173,34 @@ function select_sub_tab(win, tab, index)
         end
 end
 
+local function blur_apply_open(win, open_state)
+        local cfg = win.BlurConfig or {}
+        if win._blur then
+                local size = 0
+                if open_state then
+                        size = cfg.Size or 24
+                end
+                tween(win._blur, 0.16, { Size = size })
+        end
+        if win._blur_cc then
+                if open_state then
+                        tween(win._blur_cc, 0.16, {
+                                TintColor = cfg.Tint or rgb(255, 255, 255),
+                                Brightness = cfg.Brightness or 0,
+                                Saturation = cfg.Saturation or 0,
+                                Contrast = cfg.Contrast or 0,
+                        })
+                else
+                        tween(win._blur_cc, 0.16, {
+                                TintColor = rgb(255, 255, 255),
+                                Brightness = 0,
+                                Saturation = 0,
+                                Contrast = 0,
+                        })
+                end
+        end
+end
+
 local function fade_window(win, state)
         local main = win.Main
         if state then
@@ -1157,9 +1209,7 @@ local function fade_window(win, state)
                         main.GroupTransparency = 1
                         tween(main, 0.16, { GroupTransparency = 0 })
                 end
-                if win._blur then
-                        tween(win._blur, 0.16, { Size = 24 })
-                end
+                blur_apply_open(win, true)
                 win.Open = true
         else
                 if HAS_CG then
@@ -1172,21 +1222,23 @@ local function fade_window(win, state)
                 else
                         main.Visible = false
                 end
-                if win._blur then
-                        tween(win._blur, 0.16, { Size = 0 })
-                end
+                blur_apply_open(win, false)
                 win.Open = false
                 close_popup(win)
         end
 end
 
 local function set_blur_enabled(win, enabled)
+        enabled = enabled and true or false
+        if win.BlurConfig then
+                win.BlurConfig.Enabled = enabled
+        end
         if enabled then
                 if not win._blur then
                         local ok, blur = pcall(function()
                                 local b = Instance.new("BlurEffect")
                                 b.Name = "AirflowBlur"
-                                b.Size = win.Open and 24 or 0
+                                b.Size = 0
                                 b.Parent = Lighting
                                 return b
                         end)
@@ -1194,9 +1246,31 @@ local function set_blur_enabled(win, enabled)
                                 win._blur = blur
                         end
                 end
-        elseif win._blur then
-                win._blur:Destroy()
-                win._blur = nil
+                if not win._blur_cc then
+                        local ok_cc, cc = pcall(function()
+                                local c = Instance.new("ColorCorrectionEffect")
+                                c.Name = "AirflowColorCorrection"
+                                c.Brightness = 0
+                                c.Saturation = 0
+                                c.Contrast = 0
+                                c.TintColor = rgb(255, 255, 255)
+                                c.Parent = Lighting
+                                return c
+                        end)
+                        if ok_cc then
+                                win._blur_cc = cc
+                        end
+                end
+                blur_apply_open(win, win.Open)
+        else
+                if win._blur then
+                        win._blur:Destroy()
+                        win._blur = nil
+                end
+                if win._blur_cc then
+                        win._blur_cc:Destroy()
+                        win._blur_cc = nil
+                end
         end
 end
 
@@ -3354,41 +3428,41 @@ local function build_watermark(win)
                 return
         end
         local cfg = win.WatermarkConfig or {}
+        local wm_color, wm_transp = theme_color(win.Theme, "Watermark")
+        if cfg.Color then
+                wm_color = cfg.Color
+        end
+        if type(cfg.Transparency) == "number" then
+                wm_transp = clamp(cfg.Transparency, 0, 1)
+        end
         local wm = make("Frame", {
                 Name = "Watermark",
                 AnchorPoint = Vector2.new(1, 0),
                 Position = UDim2.new(1, -10, 0, 10),
                 Size = UDim2.fromOffset(0, 32),
                 AutomaticSize = Enum.AutomaticSize.X,
-                BackgroundColor3 = win.Theme.Body.Color,
-                BackgroundTransparency = win.Theme.Body.Transparency,
+                BackgroundColor3 = wm_color,
+                BackgroundTransparency = wm_transp,
                 BorderSizePixel = 0,
                 Parent = win.ScreenGui,
         })
         corner(wm, 3)
         stroke(wm, win.Theme.Border.Color, win.Theme.Border.Transparency, 1)
 
-        local left = make("Frame", {
-                Name = "Left",
-                Size = UDim2.fromOffset(0, 29),
-                AutomaticSize = Enum.AutomaticSize.X,
-                BackgroundColor3 = win.Theme.Header.Color,
-                BackgroundTransparency = win.Theme.Header.Transparency,
-                BorderSizePixel = 0,
-                Parent = wm,
-        })
-        corner(left, 3)
-        local left_layout = make("UIListLayout", {
+        local name_color = cfg.NameColor or cfg.TextColor or win.Theme.TextPrimary.Color
+        local info_color = cfg.InfoColor or cfg.TextColor or win.Theme.TextSecondary.Color
+
+        local wm_layout = make("UIListLayout", {
                 FillDirection = Enum.FillDirection.Horizontal,
                 VerticalAlignment = Enum.VerticalAlignment.Center,
                 SortOrder = Enum.SortOrder.LayoutOrder,
-                Padding = UDim.new(0, 6),
-                Parent = left,
+                Padding = UDim.new(0, 8),
+                Parent = wm,
         })
         make("UIPadding", {
                 PaddingLeft = UDim.new(0, 10),
                 PaddingRight = UDim.new(0, 10),
-                Parent = left,
+                Parent = wm,
         })
 
         local icon_holder = make("Frame", {
@@ -3396,9 +3470,13 @@ local function build_watermark(win)
                 Size = UDim2.fromOffset(16, 16),
                 BackgroundTransparency = 1,
                 LayoutOrder = 1,
-                Parent = left,
+                Parent = wm,
         })
-        set_icon_display(win, icon_holder, win.Icon, 16, win.Theme.Accent)
+        if cfg.ShowIcon == false then
+                icon_holder.Visible = false
+        else
+                set_icon_display(win, icon_holder, win.Icon, 16, win.Theme.Accent)
+        end
 
         local prefix_label = make("TextLabel", {
                 Name = "Prefix",
@@ -3408,31 +3486,23 @@ local function build_watermark(win)
                 Font = win.Font,
                 TextSize = 14,
                 Text = win.Name,
-                TextColor3 = win.Theme.TextPrimary.Color,
-                LayoutOrder = 2,
-                Parent = left,
-        })
-
-        local right = make("Frame", {
-                Name = "Right",
-                Size = UDim2.fromOffset(0, 29),
-                AutomaticSize = Enum.AutomaticSize.X,
-                BackgroundTransparency = 1,
+                TextColor3 = name_color,
                 LayoutOrder = 2,
                 Parent = wm,
         })
-        local right_layout = make("UIListLayout", {
-                FillDirection = Enum.FillDirection.Horizontal,
-                VerticalAlignment = Enum.VerticalAlignment.Center,
-                SortOrder = Enum.SortOrder.LayoutOrder,
-                Padding = UDim.new(0, 0),
-                Parent = right,
-        })
-        make("UIPadding", {
-                PaddingLeft = UDim.new(0, 10),
-                PaddingRight = UDim.new(0, 10),
-                Parent = right,
-        })
+
+        if cfg.Divider ~= false then
+                local div = make("Frame", {
+                        Name = "Divider",
+                        Size = UDim2.fromOffset(1, 14),
+                        BackgroundTransparency = 0.35,
+                        BorderSizePixel = 0,
+                        LayoutOrder = 3,
+                        Parent = wm,
+                })
+                track_accent(win, div, "bg")
+        end
+
         local info_label = make("TextLabel", {
                 Name = "Info",
                 Size = UDim2.fromOffset(0, 16),
@@ -3441,10 +3511,9 @@ local function build_watermark(win)
                 Font = win.Font,
                 TextSize = 14,
                 Text = "",
-                TextColor3 = win.Theme.TextPrimary.Color,
-                TextTransparency = 0.15,
-                LayoutOrder = 1,
-                Parent = right,
+                TextColor3 = info_color,
+                LayoutOrder = 4,
+                Parent = wm,
         })
 
         win._chrome.Watermark = wm
@@ -3516,12 +3585,20 @@ local function build_keybind_list(win)
                 return
         end
         local cfg = win.KeybindsConfig or {}
+        local kb_color, kb_transp = theme_color(win.Theme, "Keybinds")
+        if cfg.Color then
+                kb_color = cfg.Color
+        end
+        if type(cfg.Transparency) == "number" then
+                kb_transp = clamp(cfg.Transparency, 0, 1)
+        end
+        local kb_text_color = cfg.TextColor
         local kb = make("Frame", {
                 Name = "KeybindsList",
                 Position = UDim2.fromOffset(cfg.X or 10, cfg.Y or 200),
                 Size = UDim2.fromOffset(176, 40),
-                BackgroundColor3 = win.Theme.Body.Color,
-                BackgroundTransparency = win.Theme.Body.Transparency,
+                BackgroundColor3 = kb_color,
+                BackgroundTransparency = kb_transp,
                 BorderSizePixel = 0,
                 Parent = win.ScreenGui,
         })
@@ -3531,8 +3608,7 @@ local function build_keybind_list(win)
         local header = make("Frame", {
                 Name = "Header",
                 Size = UDim2.new(1, 0, 0, 32),
-                BackgroundColor3 = win.Theme.Header.Color,
-                BackgroundTransparency = win.Theme.Header.Transparency,
+                BackgroundTransparency = 1,
                 BorderSizePixel = 0,
                 Parent = kb,
         })
@@ -3542,7 +3618,7 @@ local function build_keybind_list(win)
                 Name = "Icon",
                 Position = UDim2.fromOffset(51, 9),
                 Size = UDim2.fromOffset(16, 16),
-                BackgroundColor3 = win.Theme.TextPrimary.Color,
+                BackgroundColor3 = kb_text_color or win.Theme.TextPrimary.Color,
                 BackgroundTransparency = 0.5,
                 BorderSizePixel = 0,
                 Parent = header,
@@ -3552,7 +3628,7 @@ local function build_keybind_list(win)
                 Name = "Key1",
                 Position = UDim2.fromOffset(3, 4),
                 Size = UDim2.fromOffset(10, 2),
-                BackgroundColor3 = win.Theme.TextPrimary.Color,
+                BackgroundColor3 = kb_text_color or win.Theme.TextPrimary.Color,
                 BackgroundTransparency = 0,
                 BorderSizePixel = 0,
                 Parent = icon,
@@ -3561,7 +3637,7 @@ local function build_keybind_list(win)
                 Name = "Key2",
                 Position = UDim2.fromOffset(3, 10),
                 Size = UDim2.fromOffset(6, 2),
-                BackgroundColor3 = win.Theme.TextPrimary.Color,
+                BackgroundColor3 = kb_text_color or win.Theme.TextPrimary.Color,
                 BackgroundTransparency = 0,
                 BorderSizePixel = 0,
                 Parent = icon,
@@ -3574,8 +3650,8 @@ local function build_keybind_list(win)
                 BackgroundTransparency = 1,
                 Font = win.Font,
                 TextSize = 14,
-                Text = "keybinds",
-                TextColor3 = win.Theme.TextPrimary.Color,
+                Text = tostring(cfg.Title or "keybinds"),
+                TextColor3 = kb_text_color or win.Theme.TextPrimary.Color,
                 TextXAlignment = Enum.TextXAlignment.Left,
                 Parent = header,
         })
@@ -4134,6 +4210,26 @@ local function assemble_window(win)
 
         win.SetTheme = function(self, theme)
                 win.Theme = merge_theme(win.Theme, theme)
+                if type(theme) == "table" and type(theme.Blur) == "table" then
+                        local bc = win.BlurConfig
+                        local b = theme.Blur
+                        if b.Size then
+                                bc.Size = clamp(b.Size, 0, 64)
+                        end
+                        if b.Tint or b.Color then
+                                bc.Tint = b.Tint or b.Color
+                        end
+                        if b.Brightness then
+                                bc.Brightness = b.Brightness
+                        end
+                        if b.Saturation then
+                                bc.Saturation = b.Saturation
+                        end
+                        if b.Contrast then
+                                bc.Contrast = b.Contrast
+                        end
+                        blur_apply_open(win, win.Open)
+                end
                 apply_theme(win)
                 build_watermark(win)
                 build_keybind_list(win)
@@ -4182,16 +4278,107 @@ local function assemble_window(win)
                 return win._draggable
         end
 
-        win.SetBlur = function(self, state)
-                set_blur_enabled(win, state == true)
+        win.SetBlur = function(self, cfg)
+                local bc = win.BlurConfig
+                if type(cfg) == "table" then
+                        if cfg.Enabled ~= nil then
+                                bc.Enabled = cfg.Enabled and true or false
+                        end
+                        if cfg.Size then
+                                bc.Size = clamp(cfg.Size, 0, 64)
+                        end
+                        if cfg.Tint or cfg.Color then
+                                bc.Tint = cfg.Tint or cfg.Color
+                        end
+                        if cfg.Brightness then
+                                bc.Brightness = cfg.Brightness
+                        end
+                        if cfg.Saturation then
+                                bc.Saturation = cfg.Saturation
+                        end
+                        if cfg.Contrast then
+                                bc.Contrast = cfg.Contrast
+                        end
+                        set_blur_enabled(win, bc.Enabled)
+                else
+                        set_blur_enabled(win, cfg == true)
+                end
+        end
+
+        win.GetBlurConfig = function(self)
+                local out = {}
+                for k, v in pairs(win.BlurConfig) do
+                        out[k] = v
+                end
+                return out
+        end
+
+        win.SetBlurColor = function(self, color)
+                if color then
+                        win.BlurConfig.Tint = color
+                        if win.Open then
+                                blur_apply_open(win, true)
+                        end
+                end
+        end
+
+        win.GetBlurColor = function(self)
+                return win.BlurConfig.Tint
+        end
+
+        win.SetBlurSize = function(self, size)
+                if type(size) == "number" then
+                        win.BlurConfig.Size = clamp(size, 0, 64)
+                        if win.Open then
+                                blur_apply_open(win, true)
+                        end
+                end
+        end
+
+        win.GetBlurSize = function(self)
+                return win.BlurConfig.Size
+        end
+
+        win.SetBlurBrightness = function(self, v)
+                if type(v) == "number" then
+                        win.BlurConfig.Brightness = v
+                        if win.Open then
+                                blur_apply_open(win, true)
+                        end
+                end
+        end
+
+        win.SetBlurSaturation = function(self, v)
+                if type(v) == "number" then
+                        win.BlurConfig.Saturation = v
+                        if win.Open then
+                                blur_apply_open(win, true)
+                        end
+                end
+        end
+
+        win.SetBlurContrast = function(self, v)
+                if type(v) == "number" then
+                        win.BlurConfig.Contrast = v
+                        if win.Open then
+                                blur_apply_open(win, true)
+                        end
+                end
         end
 
         win.SetWatermark = function(self, cfg)
                 if type(cfg) == "boolean" then
                         win.WatermarkEnabled = cfg
                 elseif type(cfg) == "table" then
-                        win.WatermarkConfig = cfg
-                        win.WatermarkEnabled = cfg.Enabled ~= false
+                        local merged = {}
+                        for k, v in pairs(win.WatermarkConfig or {}) do
+                                merged[k] = v
+                        end
+                        for k, v in pairs(cfg) do
+                                merged[k] = v
+                        end
+                        win.WatermarkConfig = merged
+                        win.WatermarkEnabled = merged.Enabled ~= false
                 end
                 build_watermark(win)
         end
@@ -4200,8 +4387,15 @@ local function assemble_window(win)
                 if type(cfg) == "boolean" then
                         win.KeybindsEnabled = cfg
                 elseif type(cfg) == "table" then
-                        win.KeybindsConfig = cfg
-                        win.KeybindsEnabled = cfg.Enabled ~= false
+                        local merged = {}
+                        for k, v in pairs(win.KeybindsConfig or {}) do
+                                merged[k] = v
+                        end
+                        for k, v in pairs(cfg) do
+                                merged[k] = v
+                        end
+                        win.KeybindsConfig = merged
+                        win.KeybindsEnabled = merged.Enabled ~= false
                 end
                 build_keybind_list(win)
                 refresh_keybind_list(win)
@@ -4266,6 +4460,12 @@ local function assemble_window(win)
                                 win._blur:Destroy()
                         end)
                         win._blur = nil
+                end
+                if win._blur_cc then
+                        pcall(function()
+                                win._blur_cc:Destroy()
+                        end)
+                        win._blur_cc = nil
                 end
                 pcall(function()
                         win.ScreenGui:Destroy()
